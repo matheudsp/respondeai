@@ -1,11 +1,11 @@
 {
-  "id": "8d18d991-2210-4c7a-9ec2-fe65b453c7d6",
-  "prevId": "7bfe7fd4-1ff3-4373-8b4a-f62227d15401",
+  "id": "42a16fc9-dffa-4cc7-bc2c-cca38da5d7a6",
+  "prevId": "9fec2464-3a2c-40cf-87dc-f88a10a209e8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.issues": {
-      "name": "issues",
+    "public.questions": {
+      "name": "questions",
       "schema": "",
       "columns": {
         "id": {
@@ -14,69 +14,31 @@
           "primaryKey": true,
           "notNull": true
         },
-        "title": {
-          "name": "title",
+        "content": {
+          "name": "content",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "description": {
-          "name": "description",
+        "author": {
+          "name": "author",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "userId": {
-          "name": "userId",
+        "upvotes": {
+          "name": "upvotes",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": 0
         },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "timestamp with time zone",
+        "answered": {
+          "name": "answered",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "issues_userId_users_id_fk": {
-          "name": "issues_userId_users_id_fk",
-          "tableFrom": "issues",
-          "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.users": {
-      "name": "users",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
+          "default": false
         },
         "createdAt": {
           "name": "createdAt",

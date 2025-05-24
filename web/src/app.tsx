@@ -1,112 +1,194 @@
 import './db/future/storage'
 
-import { useLiveQuery, useOptimisticMutation } from '@tanstack/react-db'
-import { issues } from './db/collections/issues'
-import { users } from './db/collections/users'
+import { useLiveQuery } from '@tanstack/react-db'
+import { questions } from './db/collections/questions'
+import { useState } from 'react'
 
 export function App() {
+  const [authorName, setAuthorName] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const { data } = useLiveQuery(query => {
     return query
-      .from({ issues })
-      .join({
-        type: 'inner',
-        from: { users },
-        on: ['@users.id', '=', '@issues.userId'],
-      })
-      .select('@issues.id', '@issues.title', '@issues.createdAt', '@users.name')
-      .limit(5)
-      .orderBy({ '@issues.id': 'desc' })
+      .from({ questions })
+      .select('@questions.id', '@questions.content', '@questions.author', '@questions.upvotes', '@questions.answered', '@questions.createdAt')
+      .orderBy({ '@questions.upvotes': 'desc', '@questions.createdAt': 'desc' })
       .keyBy('@id')
   })
 
-  const createIssueMutation = useOptimisticMutation({
-    mutationFn: async ({ transaction }) => {
-      const { collection, modified } = transaction.mutations[0]
+  async function handleSubmit() {
+    const contentElement = document.getElementById('question-content') as HTMLTextAreaElement
+    const content = contentElement?.value
 
-      console.log({ modified })
-
-      // await fetch('http://localhost:3333/issues', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({
-      //     userId: 1,
-      //     title: modified.title,
-      //   }),
-      // })
-
-      await collection.commitPendingTransactions
-    },
-  })
-
-  async function createIssue(data: FormData) {
-    const title = data.get('title')?.toString()
-
-    if (!title?.trim()) {
+    if (!content?.trim() || !authorName?.trim()) {
       return
     }
 
-    await fetch('http://localhost:3333/issues', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId: 1,
-        title,
-      }),
-    })
+    setIsSubmitting(true)
 
-    // createIssueMutation.mutate(() => {
-    //   issues.insert({
-    //     id: Math.round(Math.random() * 100000),
-    //     title,
-    //     description: null,
-    //     userId: 1,
-    //     createdAt: new Date().toISOString(),
-    //   })
-    // })
+    try {
+      await fetch('http://localhost:3333/questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: content.trim(),
+          author: authorName.trim(),
+        }),
+      })
+
+      // Clear form
+      contentElement.value = ''
+    } catch (error) {
+      console.error('Failed to create question:', error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
+  async function upvoteQuestion(questionId: number) {
+    try {
+      await fetch(`http://localhost:3333/questions/${questionId}/upvote`, {
+        method: 'PATCH',
+      })
+    } catch (error) {
+      console.error('Failed to upvote question:', error)
+    }
+  }
+
+  async function markAsAnswered(questionId: number) {
+    try {
+      await fetch(`http://localhost:3333/questions/${questionId}/answer`, {
+        method: 'PATCH',
+      })
+    } catch (error) {
+      console.error('Failed to mark as answered:', error)
+    }
+  }
+
+  const unansweredQuestions = data.filter(q => !q.answered)
+  const answeredQuestions = data.filter(q => q.answered)
+
   return (
-    <div className="p-4 space-y-4">
-      <h1 className="font-bold text-xl">Issues</h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-white mb-2">
+            💬 Perguntas da Aula
+          </h1>
+          <p className="text-purple-200">
+            Faça suas perguntas em tempo real e vote nas mais importantes
+          </p>
+        </div>
 
-      <form action={createIssue} className="flex flex-col items-end gap-3">
-        <textarea
-          name="title"
-          placeholder="Create new issue..."
-          className="bg-[#17181A] text-sm outline-none shadow-sm p-4 rounded-lg inset-ring-1 inset-ring-white/5 w-full resize-y ring-indigo-500 focus:ring-1"
-        />
-
-        <button
-          type="submit"
-          className="bg-indigo-500 text-white text-sm rounded-lg px-3 h-7 inset-ring-1 inset-ring-white/5 font-medium cursor-pointer hover:bg-indigo-600"
-        >
-          Create issue
-        </button>
-      </form>
-
-      <div className="h-px w-full bg-zinc-900" />
-
-      <ul className="space-y-3">
-        {data.map(item => {
-          return (
-            <li
-              key={item.id}
-              className="bg-[#17181A] shadow-sm p-4 rounded-lg inset-ring-1 inset-ring-white/5 space-y-2"
+        {/* Question Form */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-8 border border-white/20">
+          <div className="space-y-4">
+            <div>
+              <input
+                type="text"
+                placeholder="Seu nome..."
+                value={authorName}
+                onChange={(e) => setAuthorName(e.target.value)}
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <textarea
+                id="question-content"
+                placeholder="Digite sua pergunta aqui..."
+                rows={3}
+                className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent resize-none"
+              />
+            </div>
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold py-3 px-6 rounded-lg hover:from-purple-600 hover:to-pink-600 focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
-              <p>{item.createdAt}</p>
-              <p className="text-xs text-zinc-400">
-                ISS-{String(item.id).padStart(3, '0')}
+              {isSubmitting ? 'Enviando...' : '🚀 Enviar Pergunta'}
+            </button>
+          </div>
+        </div>
+
+        {/* Active Questions */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+            🔥 Perguntas Ativas ({unansweredQuestions.length})
+          </h2>
+          
+          {unansweredQuestions.length === 0 ? (
+            <div className="bg-white/5 backdrop-blur-lg rounded-xl p-8 text-center border border-white/10">
+              <p className="text-purple-200 text-lg">
+                Nenhuma pergunta ainda. Seja o primeiro a perguntar! 🤔
               </p>
-              <p className="text-sm">{item.title}</p>
-              <p className="text-sm text-zinc-400">{item.name}</p>
-            </li>
-          )
-        })}
-      </ul>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {unansweredQuestions.map(question => (
+                <div
+                  key={question.id}
+                  className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-200"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-white text-lg mb-2">{question.content}</p>
+                      <div className="flex items-center gap-4 text-sm text-purple-200">
+                        <span>👤 {question.author}</span>
+                        <span>🕒 {new Date(question.createdAt).toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => upvoteQuestion(question.id)}
+                        className="flex items-center gap-2 bg-purple-500/20 hover:bg-purple-500/40 text-purple-200 px-3 py-2 rounded-lg transition-colors duration-200"
+                      >
+                        👍 {question.upvotes}
+                      </button>
+                      <button
+                        onClick={() => markAsAnswered(question.id)}
+                        className="bg-green-500/20 hover:bg-green-500/40 text-green-200 px-3 py-2 rounded-lg transition-colors duration-200 text-sm"
+                      >
+                        ✅ Respondida
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Answered Questions */}
+        {answeredQuestions.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+              ✅ Perguntas Respondidas ({answeredQuestions.length})
+            </h2>
+            <div className="space-y-3">
+              {answeredQuestions.map(question => (
+                <div
+                  key={question.id}
+                  className="bg-green-500/10 backdrop-blur-lg rounded-xl p-4 border border-green-500/20 opacity-75"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="text-white mb-2">{question.content}</p>
+                      <div className="flex items-center gap-4 text-sm text-green-200">
+                        <span>👤 {question.author}</span>
+                        <span>👍 {question.upvotes}</span>
+                        <span>🕒 {new Date(question.createdAt).toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                    <div className="text-green-400 text-xl">✅</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
